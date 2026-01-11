@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Songify AI | Professional Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; color: white; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .neon-text { text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        .gradient-bg { background: radial-gradient(circle at top right, #1e1b4b, #000000); }
+        .btn-glow:hover { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transform: translateY(-2px); transition: all 0.3s; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+
+    <div class="absolute top-0 left-0 w-96 h-96 bg-blue-600/10 blur-[120px] rounded-full"></div>
+    <div class="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full"></div>
+
+    <div class="w-full max-w-2xl glass rounded-3xl p-8 shadow-2xl relative z-10">
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold tracking-tight mb-2 neon-text">SONGIFY <span class="text-blue-500">AI</span></h1>
+            <p class="text-gray-400 text-sm">Create studio-quality music with professional lyrics.</p>
+        </div>
+
+        <div id="inputArea" class="space-y-6">
+            <div class="relative">
+                <label class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-2 block">Describe your vibe</label>
+                <input id="prompt" type="text" placeholder="e.g. A romantic Marathi song with soft guitar..." 
+                       class="w-full bg-black/50 p-4 rounded-2xl border border-gray-800 focus:border-blue-500 outline-none transition-all">
+            </div>
+            <button onclick="getLyrics()" id="mainBtn" class="w-full bg-blue-600 py-4 rounded-2xl font-bold text-lg btn-glow">
+                Write Lyrics ✨
+            </button>
+        </div>
+
+        <div id="editArea" class="hidden animate-in fade-in duration-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">📝 Review & Edit Lyrics</h3>
+                <span class="text-xs bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/30">Transliterated</span>
+            </div>
+            <textarea id="lyricsBox" 
+                      class="w-full h-72 bg-black/40 p-5 rounded-2xl border border-gray-700 focus:border-blue-500 outline-none text-gray-200 leading-relaxed text-sm mb-6"></textarea>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="location.reload()" class="bg-gray-800 py-4 rounded-2xl font-semibold hover:bg-gray-700 transition">Discard</button>
+                <button onclick="confirmAndPlay()" class="bg-blue-600 py-4 rounded-2xl font-bold btn-glow">Confirm & Generate 🎵</button>
+            </div>
+        </div>
+
+        <div id="statusArea" class="hidden space-y-6">
+            <div class="py-10 text-center">
+                <div id="loaderIcon" class="inline-block w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                <h3 id="stext" class="text-xl font-semibold text-blue-400">Recording Session...</h3>
+                <p class="text-gray-500 text-xs mt-2">Our AI is composing your track. This usually takes 60s.</p>
+            </div>
+            
+            <div id="audioDiv" class="animate-in slide-in-from-bottom duration-1000">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = "";
+        
+        async function getLyrics() {
+            const topic = document.getElementById('prompt').value;
+            if(!topic) return alert("Please enter a topic!");
+            
+            const btn = document.getElementById('mainBtn');
+            btn.innerHTML = `<span class="animate-pulse">Thinking...</span>`;
+            btn.disabled = true;
+
+            const fd = new FormData(); fd.append('prompt', topic);
+            const res = await fetch('/get-lyrics', { method: 'POST', body: fd });
+            const data = await res.json();
+
+            currentJobId = data.job_id;
+            document.getElementById('lyricsBox').value = data.lyrics;
+            document.getElementById('inputArea').classList.add('hidden');
+            document.getElementById('editArea').classList.remove('hidden');
+        }
+
+        async function confirmAndPlay() {
+            const lyrics = document.getElementById('lyricsBox').value;
+            const topic = document.getElementById('prompt').value;
+            
+            document.getElementById('editArea').classList.add('hidden');
+            document.getElementById('statusArea').classList.remove('hidden');
+
+            const fd = new FormData();
+            fd.append('job_id', currentJobId);
+            fd.append('final_lyrics', lyrics);
+            fd.append('topic', topic);
+            
+            await fetch('/confirm-lyrics', { method: 'POST', body: fd });
+
+            const timer = setInterval(async () => {
+                const res = await fetch('/status/' + currentJobId);
+                const data = await res.json();
+                document.getElementById('stext').innerText = data.status;
+                
+                if(data.status === "Success") {
+                    clearInterval(timer);
+                    document.getElementById('loaderIcon').classList.add('hidden');
+                    document.getElementById('audioDiv').innerHTML = `
+                        <div class="glass p-6 rounded-2xl border-blue-500/30">
+                            <p class="text-sm font-bold text-blue-400 mb-4 uppercase tracking-widest">Mastered Track Ready</p>
+                            <audio controls class="w-full brightness-110 contrast-125 rounded-lg">
+                                <source src="${data.audio}">
+                            </audio>
+                            <button onclick="location.reload()" class="w-full mt-6 text-xs text-gray-500 hover:text-white transition">Create Another Song</button>
+                        </div>
+                    `;
+                    document.getElementById('stext').innerText = "Enjoy your masterpiece!";
+                }
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
