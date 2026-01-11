@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SONGIFY AI | Ultra-Pro Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #2563eb; --bg: #030305; --glass: rgba(255, 255, 255, 0.03); }
+        body {
+            background-color: var(--bg); color: white; font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at 50% -20%, #1e3a8a 0%, #030305 60%);
+            min-height: 100vh; display: flex; flex-col; items: center;
+        }
+        .syncopate { font-family: 'Syncopate', sans-serif; }
+        .glass-panel { background: var(--glass); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .glow-button { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); box-shadow: 0 0 20px rgba(37, 99, 235, 0.3); transition: all 0.3s ease; }
+        .glow-button:hover { transform: translateY(-3px); box-shadow: 0 0 40px rgba(37, 99, 235, 0.6); }
+        .error-shake { animation: shake 0.4s ease-in-out; border-color: #ef4444 !important; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        input[type='range'] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type='range']::-webkit-slider-runnable-track { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; }
+        input[type='range']::-webkit-slider-thumb { height: 18px; width: 18px; border-radius: 50%; background: #fff; -webkit-appearance: none; margin-top: -6px; }
+    </style>
+</head>
+<body class="flex flex-col items-center px-6">
+
+    <div class="w-full max-w-2xl py-12">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl font-black italic tracking-tighter syncopate bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-500">SONGIFY</h1>
+            <p class="text-gray-500 text-[10px] uppercase tracking-widest font-bold mt-2">Professional English AI Studio</p>
+        </header>
+
+        <div id="box1" class="glass-panel p-10 rounded-[3rem]">
+            <h3 class="text-lg font-bold mb-6 italic">Sound Prompt</h3>
+            <input id="prompt" type="text" placeholder="e.g., Romantic road trip across Europe..." 
+                class="w-full bg-black/40 border border-white/5 p-6 rounded-2xl mb-6 outline-none focus:border-blue-500 transition-all text-xl font-light">
+            <button onclick="getLyrics()" id="btn1" class="w-full py-5 rounded-2xl font-black text-white glow-button uppercase tracking-widest text-sm">Initiate AI drafting</button>
+            <p id="errDisplay" class="hidden text-red-500 text-[11px] mt-6 font-bold uppercase text-center italic"></p>
+        </div>
+
+        <div id="box2" class="hidden glass-panel p-10 rounded-[3rem]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-sm font-bold uppercase tracking-widest text-blue-500">English Score</h3>
+                <span class="text-[10px] text-gray-500 font-mono" id="wcount">0 Words</span>
+            </div>
+            <textarea id="lyricBox" class="w-full h-80 bg-black/60 border border-white/5 p-6 rounded-2xl mb-6 text-base leading-relaxed font-mono text-gray-300 outline-none"></textarea>
+            <div class="flex gap-4">
+                <button onclick="location.reload()" class="px-8 py-5 rounded-2xl font-bold bg-white/5 text-xs uppercase tracking-widest">Discard</button>
+                <button onclick="startMusic()" class="flex-1 py-5 rounded-2xl font-black glow-button uppercase tracking-widest text-sm">Record Master 🎵</button>
+            </div>
+        </div>
+
+        <div id="box3" class="hidden glass-panel p-12 rounded-[3rem] text-center">
+            <div id="loader">
+                <div class="w-16 h-16 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin mx-auto mb-10"></div>
+                <h2 id="stext" class="text-xl font-black uppercase tracking-tighter mb-4 italic">Rendering Audio</h2>
+                <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div id="pbar" class="h-full bg-blue-500 w-0 transition-all duration-1000"></div>
+                </div>
+            </div>
+            <div id="playerUI" class="hidden">
+                <div class="p-8 bg-blue-600/10 rounded-[2.5rem] border border-white/10 mb-10">
+                    <button onclick="toggleAudio()" class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl">
+                        <svg id="pIcon" class="w-10 h-10 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    <input type="range" id="seek" value="0" step="0.1" class="mb-4">
+                </div>
+                <button onclick="download()" class="w-full py-6 rounded-2xl bg-white/5 font-bold uppercase text-xs tracking-widest border border-white/10">Download MP3</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="aud"></audio>
+
+    <script>
+        let jid = "";
+        const player = document.getElementById('aud');
+        
+        async function getLyrics() {
+            const p = document.getElementById('prompt').value;
+            const b = document.getElementById('btn1');
+            const err = document.getElementById('errDisplay');
+            if(!p) return;
+            
+            b.innerText = "DRAFTING...";
+            err.classList.add('hidden');
+            
+            const fd = new FormData();
+            fd.append('prompt', p);
+            try {
+                const res = await fetch('/get-lyrics', { method: 'POST', body: fd });
+                const data = await res.json();
+                
+                if(data.job_id === "error") throw new Error(data.lyrics);
+                
+                jid = data.job_id;
+                document.getElementById('lyricBox').value = data.lyrics;
+                document.getElementById('wcount').innerText = data.lyrics.split(/\s+/).length + " Words";
+                document.getElementById('box1').classList.add('hidden');
+                document.getElementById('box2').classList.remove('hidden');
+            } catch (e) {
+                b.innerText = "INITIATE AI DRAFTING";
+                err.innerText = e.message;
+                err.classList.remove('hidden');
+                document.getElementById('box1').classList.add('error-shake');
+            }
+        }
+
+        async function startMusic() {
+            const l = document.getElementById('lyricBox').value;
+            const t = document.getElementById('prompt').value;
+            document.getElementById('box2').classList.add('hidden');
+            document.getElementById('box3').classList.remove('hidden');
+
+            const fd = new FormData();
+            fd.append('job_id', jid); fd.append('final_lyrics', l); fd.append('topic', t);
+            await fetch('/confirm-lyrics', { method: 'POST', body: fd });
+
+            let prog = 0;
+            const iv = setInterval(async () => {
+                const r = await fetch('/status/'+jid);
+                const d = await r.json();
+                if(prog < 90) prog += 2;
+                document.getElementById('pbar').style.width = prog + '%';
+                document.getElementById('stext').innerText = d.status.toUpperCase();
+                
+                if(d.status === "Success") {
+                    clearInterval(iv);
+                    document.getElementById('pbar').style.width = '100%';
+                    document.getElementById('loader').classList.add('hidden');
+                    document.getElementById('playerUI').classList.remove('hidden');
+                    player.src = d.audio;
+                }
+            }, 7000);
+        }
+
+        function toggleAudio() {
+            const icon = document.getElementById('pIcon');
+            if(player.paused) { player.play(); icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; }
+            else { player.pause(); icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; }
+        }
+
+        async function download() {
+            const res = await fetch(player.src);
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `Songify_Export_${Date.now()}.mp3`; a.click();
+        }
+    </script>
+</body>
+</html>
