@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SONGIFY AI | Ultra-Pro Studio v4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --accent: #60a5fa;
+            --bg: #030305;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            background: radial-gradient(circle at 50% -20%, #1e3a8a 0%, #030305 60%);
+            min-height: 100vh;
+        }
+
+        .syncopate { font-family: 'Syncopate', sans-serif; }
+
+        /* Advanced Animations */
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .neon-border {
+            position: relative;
+            overflow: hidden;
+        }
+        .neon-border::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            animation: move-light 3s linear infinite;
+        }
+
+        @keyframes move-light {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .glow-button {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+        }
+        .glow-button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 0 40px rgba(37, 99, 235, 0.6);
+        }
+
+        /* Custom Audio Slider */
+        input[type='range'] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type='range']::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; cursor: pointer;
+            background: rgba(255,255,255,0.1); border-radius: 10px;
+        }
+        input[type='range']::-webkit-slider-thumb {
+            height: 18px; width: 18px; border-radius: 50%;
+            background: #fff; cursor: pointer; -webkit-appearance: none;
+            margin-top: -6px; box-shadow: 0 0 10px var(--primary);
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    </style>
+</head>
+<body class="flex flex-col items-center">
+
+    <div class="fixed inset-0 pointer-events-none z-[-1]">
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px]"></div>
+    </div>
+
+    <div class="w-full max-w-2xl px-6 py-12 relative z-10">
+        
+        <header class="text-center mb-16 space-y-4">
+            <div class="inline-block px-4 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-[10px] uppercase tracking-[0.3em] font-bold text-blue-400">Next-Gen Production</div>
+            <h1 class="text-6xl font-black italic tracking-tighter syncopate bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-500">SONGIFY</h1>
+            <p class="text-gray-500 text-sm font-medium tracking-widest uppercase">Limit: 3 Sessions per 24h</p>
+        </header>
+
+        <div id="box1" class="glass-panel p-10 rounded-[3rem] relative neon-border">
+            <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
+                <span class="w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>
+                Define Your Sound
+            </h3>
+            <input id="prompt" type="text" placeholder="Explain mood, topic or language..." 
+                class="w-full bg-black/40 border border-white/5 p-6 rounded-2xl mb-6 outline-none focus:border-blue-500 transition-all text-xl font-light placeholder:text-gray-700">
+            <button onclick="getLyrics()" id="btn1" class="w-full py-5 rounded-2xl font-black text-white glow-button uppercase tracking-widest text-sm">Initiate AI Drafting</button>
+        </div>
+
+        <div id="box2" class="hidden glass-panel p-10 rounded-[3rem] animate-in slide-in-from-bottom-10 duration-500">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-sm font-bold uppercase tracking-widest text-blue-500">AI Generated Score</h3>
+                <span class="text-[10px] text-gray-500 font-mono">Word Count: <span id="wcount">0</span>/290</span>
+            </div>
+            <textarea id="lyricBox" class="w-full h-80 bg-black/60 border border-white/5 p-6 rounded-2xl mb-6 text-base leading-relaxed font-mono text-gray-300 focus:border-blue-500 outline-none scrollbar-hide"></textarea>
+            <div class="flex gap-4">
+                <button onclick="location.reload()" class="px-8 py-5 rounded-2xl font-bold bg-white/5 hover:bg-white/10 transition-all text-xs uppercase tracking-widest">Discard</button>
+                <button onclick="startMusic()" class="flex-1 py-5 rounded-2xl font-black glow-button uppercase tracking-widest text-sm">Finalize & Record 🎵</button>
+            </div>
+        </div>
+
+        <div id="box3" class="hidden glass-panel p-12 rounded-[3rem] text-center">
+            <div id="loader">
+                <div class="relative w-24 h-24 mx-auto mb-10">
+                    <div class="absolute inset-0 border-4 border-blue-500/20 rounded-full"></div>
+                    <div class="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <svg class="w-8 h-8 text-blue-500 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    </div>
+                </div>
+                <h2 id="stext" class="text-xl font-black uppercase tracking-tighter mb-2 italic">Synthesizing Audio</h2>
+                <p class="text-gray-500 text-[10px] uppercase tracking-[0.2em]">Estimated wait: 60-90 seconds</p>
+                
+                <div class="w-full h-1 bg-white/5 rounded-full mt-10 overflow-hidden">
+                    <div id="progBar" class="h-full bg-blue-500 w-0 transition-all duration-1000"></div>
+                </div>
+            </div>
+
+            <div id="playerUI" class="hidden space-y-8 animate-in zoom-in duration-700">
+                <div class="p-8 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-[2.5rem] border border-white/10">
+                    <div class="flex items-center justify-center gap-10 mb-10">
+                        <button onclick="rewind()" class="text-gray-500 hover:text-white transition"><svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
+                        <button onclick="toggleAudio()" class="w-24 h-24 bg-white rounded-full flex items-center justify-center hover:scale-105 transition active:scale-95 shadow-2xl">
+                            <svg id="pIcon" class="w-10 h-10 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <button onclick="forward()" class="text-gray-500 hover:text-white transition"><svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
+                    </div>
+                    <input type="range" id="seekSlider" value="0" step="0.1" class="mb-4">
+                    <div class="flex justify-between text-[10px] font-mono text-gray-500 uppercase tracking-widest">
+                        <span id="curTime">0:00</span>
+                        <span id="durTime">0:00</span>
+                    </div>
+                </div>
+                
+                <div class="flex gap-4">
+                    <button onclick="downloadTrack()" class="flex-1 py-5 rounded-2xl bg-white/5 font-bold uppercase tracking-widest text-[10px] hover:bg-white/10 transition border border-white/5">Download High-Res</button>
+                    <button onclick="location.reload()" class="flex-1 py-5 rounded-2xl bg-blue-600/10 text-blue-500 font-bold uppercase tracking-widest text-[10px] hover:bg-blue-600/20 transition border border-blue-500/20">New Session</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-20">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="h-px bg-white/10 flex-1"></div>
+                <span class="text-[10px] font-bold text-gray-600 uppercase tracking-widest italic">Recent Studio Exports</span>
+                <div class="h-px bg-white/10 flex-1"></div>
+            </div>
+            <div id="history" class="space-y-4"></div>
+        </footer>
+    </div>
+
+    <audio id="mainAudio"></audio>
+
+    <script>
+        let jobId = "";
+        const aud = document.getElementById('mainAudio');
+        const seek = document.getElementById('seekSlider');
+        const pIcon = document.getElementById('pIcon');
+
+        // Stage 1 -> Stage 2
+        async function getLyrics() {
+            const p = document.getElementById('prompt').value;
+            if(!p) return;
+            
+            document.getElementById('btn1').innerText = "CALCULATING SCORE...";
+            document.getElementById('btn1').classList.add('shimmer');
+
+            const fd = new FormData();
+            fd.append('prompt', p);
+
+            try {
+                const res = await fetch('/get-lyrics', { method: 'POST', body: fd });
+                const data = await res.json();
+                
+                if(data.job_id === "error") {
+                    alert(data.lyrics);
+                    location.reload();
+                    return;
+                }
+
+                jobId = data.job_id;
+                document.getElementById('lyricBox').value = data.lyrics;
+                document.getElementById('wcount').innerText = data.lyrics.split(/\s+/).length;
+                
+                document.getElementById('box1').classList.add('hidden');
+                document.getElementById('box2').classList.remove('hidden');
+            } catch (e) {
+                alert("Studio Link Failed. Try again.");
+                location.reload();
+            }
+        }
+
+        // Stage 2 -> Stage 3
+        async function startMusic() {
+            const l = document.getElementById('lyricBox').value;
+            const t = document.getElementById('prompt').value;
+
+            document.getElementById('box2').classList.add('hidden');
+            document.getElementById('box3').classList.remove('hidden');
+
+            const fd = new FormData();
+            fd.append('job_id', jobId);
+            fd.append('final_lyrics', l);
+            fd.append('topic', t);
+
+            await fetch('/confirm-lyrics', { method: 'POST', body: fd });
+
+            let progress = 0;
+            const poll = setInterval(async () => {
+                const res = await fetch('/status/' + jobId);
+                const data = await res.json();
+                
+                // Simulated Progress Bar
+                if(progress < 95) progress += 2;
+                document.getElementById('progBar').style.width = progress + '%';
+                document.getElementById('stext').innerText = data.status + "...";
+
+                if (data.status === "Success") {
+                    clearInterval(poll);
+                    document.getElementById('progBar').style.width = '100%';
+                    initPlayer(data.audio, t);
+                }
+            }, 6000);
+        }
+
+        function initPlayer(url, title) {
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('playerUI').classList.remove('hidden');
+            aud.src = url;
+            
+            saveToHistory(title, url);
+            
+            aud.addEventListener('timeupdate', () => {
+                const pct = (aud.currentTime / aud.duration) * 100;
+                seek.value = pct;
+                document.getElementById('curTime').innerText = formatTime(aud.currentTime);
+            });
+
+            aud.addEventListener('loadedmetadata', () => {
+                document.getElementById('durTime').innerText = formatTime(aud.duration);
+            });
+        }
+
+        function toggleAudio() {
+            if(aud.paused) {
+                aud.play();
+                pIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            } else {
+                aud.pause();
+                pIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            }
+        }
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        seek.addEventListener('input', () => {
+            const time = (seek.value / 100) * aud.duration;
+            aud.currentTime = time;
+        });
+
+        async function downloadTrack() {
+            const res = await fetch(aud.src);
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Studio_Export_${Date.now()}.mp3`;
+            a.click();
+        }
+
+        function saveToHistory(t, u) {
+            let h = JSON.parse(localStorage.getItem('studio_logs') || '[]');
+            h.unshift({ t: t.substring(0, 25), u, time: new Date().toLocaleTimeString() });
+            localStorage.setItem('studio_logs', JSON.stringify(h.slice(0, 5)));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const div = document.getElementById('history');
+            const h = JSON.parse(localStorage.getItem('studio_logs') || '[]');
+            div.innerHTML = h.map(i => `
+                <div class="glass-panel p-5 rounded-2xl flex justify-between items-center group hover:border-blue-500/30 transition-all">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-widest">${i.t}...</p>
+                            <p class="text-[9px] text-gray-600 uppercase font-mono">${i.time}</p>
+                        </div>
+                    </div>
+                    <button onclick="playFromHistory('${i.u}')" class="text-[10px] font-bold text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">Recall</button>
+                </div>
+            `).join('');
+        }
+
+        function playFromHistory(u) {
+            document.getElementById('box1').classList.add('hidden');
+            document.getElementById('box2').classList.add('hidden');
+            document.getElementById('box3').classList.remove('hidden');
+            initPlayer(u, "Recall Track");
+            toggleAudio();
+        }
+
+        loadHistory();
+    </script>
+</body>
+</html>
