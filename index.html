@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SONGIFY STUDIO | PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@700&family=Inter:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { background: #030305; color: white; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .syncopate { font-family: 'Syncopate', sans-serif; }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); transition: 0.5s; }
+        .glow-btn { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); transition: 0.3s ease; }
+        .glow-btn:hover { transform: translateY(-3px); box-shadow: 0 0 40px rgba(37, 99, 235, 0.5); }
+        .loader { border-top-color: #2563eb; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="flex flex-col items-center px-6 pt-20">
+
+    <div class="w-full max-w-2xl relative z-10">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl font-black italic tracking-tighter syncopate bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-700">SONGIFY</h1>
+            <p class="text-gray-500 text-[10px] font-bold tracking-[0.4em] uppercase mt-4">2026 Professional Studio Engine</p>
+        </header>
+
+        <div id="step1" class="glass p-10 rounded-[3rem]">
+            <h3 class="text-sm font-bold mb-6 text-blue-500 uppercase tracking-widest italic">Define Sound</h3>
+            <input id="prompt" type="text" placeholder="Mood, Topic, or Travel Vibe..." 
+                class="w-full bg-black border border-white/5 p-6 rounded-2xl mb-8 outline-none focus:border-blue-500 text-xl transition-all">
+            <button onclick="getLyrics()" id="btn1" class="w-full py-5 rounded-2xl glow-btn font-black uppercase text-xs tracking-widest">Generate Score</button>
+            <p id="err" class="hidden text-red-500 text-[11px] mt-6 font-bold uppercase text-center italic"></p>
+        </div>
+
+        <div id="step2" class="hidden glass p-10 rounded-[3rem]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-sm font-bold uppercase text-blue-500 italic">Verify Score</h3>
+                <span id="wCount" class="text-[10px] text-gray-500 font-mono">0 WORDS</span>
+            </div>
+            <textarea id="lyricText" class="w-full h-80 bg-black/50 border border-white/5 p-6 rounded-2xl mb-8 text-base font-mono text-gray-300 outline-none"></textarea>
+            <div class="flex gap-4">
+                <button onclick="location.reload()" class="px-8 py-5 rounded-2xl bg-white/5 text-[10px] font-bold uppercase">Reset</button>
+                <button onclick="startMusic()" class="flex-1 py-5 rounded-2xl glow-btn font-black uppercase text-xs tracking-widest">Master Audio 🎵</button>
+            </div>
+        </div>
+
+        <div id="step3" class="hidden glass p-16 rounded-[3rem] text-center">
+            <div id="rendering">
+                <div class="w-16 h-16 border-4 border-white/5 loader rounded-full mx-auto mb-10"></div>
+                <h2 id="statusLabel" class="text-2xl font-black uppercase italic tracking-tighter mb-4">Initializing</h2>
+                <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div id="progressBar" class="h-full bg-blue-500 w-0 transition-all duration-1000"></div>
+                </div>
+            </div>
+            <div id="playerBox" class="hidden">
+                <div class="p-8 bg-blue-600/10 rounded-[2.5rem] border border-white/10 mb-10">
+                    <audio id="audio" controls class="w-full"></audio>
+                </div>
+                <button onclick="location.reload()" class="w-full py-5 rounded-2xl bg-white/5 text-[10px] font-black uppercase tracking-widest">New Session</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let jid = "";
+        async function getLyrics() {
+            const p = document.getElementById('prompt').value;
+            const b = document.getElementById('btn1');
+            const e = document.getElementById('err');
+            if(!p) return;
+            
+            b.innerText = "DRAFTING..."; b.disabled = true;
+            e.classList.add('hidden');
+
+            const fd = new FormData(); fd.append('prompt', p);
+            try {
+                const res = await fetch('/get-lyrics', { method: 'POST', body: fd });
+                const d = await res.json();
+                if(d.job_id === "error") throw new Error(d.lyrics);
+                
+                jid = d.job_id;
+                document.getElementById('lyricText').value = d.lyrics;
+                document.getElementById('wCount').innerText = d.lyrics.split(/\s+/).length + " WORDS";
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+            } catch (err) {
+                b.innerText = "GENERATE SCORE"; b.disabled = false;
+                e.innerText = err.message; e.classList.remove('hidden');
+            }
+        }
+
+        async function startMusic() {
+            const l = document.getElementById('lyricText').value;
+            const t = document.getElementById('prompt').value;
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('step3').classList.remove('hidden');
+
+            const fd = new FormData(); fd.append('job_id', jid); fd.append('final_lyrics', l); fd.append('topic', t);
+            await fetch('/confirm-lyrics', { method: 'POST', body: fd });
+
+            let progress = 0;
+            const poll = setInterval(async () => {
+                const res = await fetch('/status/' + jid);
+                const d = await res.json();
+                if(progress < 95) progress += 2;
+                document.getElementById('progressBar').style.width = progress + '%';
+                document.getElementById('statusLabel').innerText = d.status.toUpperCase();
+                
+                if(d.status === "Success") {
+                    clearInterval(poll);
+                    document.getElementById('progressBar').style.width = '100%';
+                    document.getElementById('rendering').classList.add('hidden');
+                    document.getElementById('playerBox').classList.remove('hidden');
+                    document.getElementById('audio').src = d.audio;
+                }
+                if(d.status.includes("Failed") || d.status.includes("Error")) {
+                    clearInterval(poll);
+                    alert("Studio Busy. Try again.");
+                    location.reload();
+                }
+            }, 7000);
+        }
+    </script>
+</body>
+</html>
