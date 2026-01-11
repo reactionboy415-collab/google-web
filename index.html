@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Songify AI | Studio v2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #08080a; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .neon-glow { box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+        .gradient-text { background: linear-gradient(90deg, #3b82f6, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        /* Custom Audio Slider Styling */
+        input[type='range'] { -webkit-appearance: none; background: #1f2937; height: 4px; border-radius: 5px; }
+        input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #3b82f6; border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px #3b82f6; }
+    </style>
+</head>
+<body class="min-h-screen p-4 flex flex-col items-center">
+
+    <div class="w-full max-w-xl mt-10">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold gradient-text">SONGIFY PRO</h1>
+            <p class="text-gray-500 text-sm">Professional AI Music Studio</p>
+        </div>
+
+        <div id="stage1" class="glass p-8 rounded-3xl shadow-2xl mb-6">
+            <input id="prompt" type="text" placeholder="e.g. Energetic Marathi Dance Beat..." 
+                   class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl outline-none focus:border-blue-500 transition-all text-lg mb-4">
+            <button onclick="getLyrics()" id="btn1" class="w-full bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-bold neon-glow transition-all">
+                Generate Lyrics ✨
+            </button>
+        </div>
+
+        <div id="stage2" class="hidden glass p-8 rounded-3xl mb-6 animate-in fade-in zoom-in duration-300">
+            <textarea id="lyricsBox" class="w-full h-64 bg-black/40 border border-white/10 p-4 rounded-2xl text-sm leading-relaxed outline-none mb-4"></textarea>
+            <div class="flex gap-3">
+                <button onclick="location.reload()" class="flex-1 bg-gray-800 py-4 rounded-2xl font-semibold">Discard</button>
+                <button onclick="confirmLyrics()" class="flex-1 bg-blue-600 py-4 rounded-2xl font-bold neon-glow">Create Music 🎵</button>
+            </div>
+        </div>
+
+        <div id="stage3" class="hidden glass p-8 rounded-3xl mb-6">
+            <div id="statusHeader" class="text-center mb-6">
+                <div id="spinner" class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500/20 border-t-blue-500 mb-2"></div>
+                <h2 id="statusText" class="text-blue-400 font-bold">Initializing Session...</h2>
+            </div>
+
+            <div id="customPlayer" class="hidden">
+                <div class="bg-white/5 p-6 rounded-2xl border border-white/10">
+                    <div class="flex items-center gap-4 mb-4">
+                        <button id="playBtn" onclick="togglePlay()" class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
+                            <svg id="playIcon" class="w-6 h-6 fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <div class="flex-1">
+                            <div class="flex justify-between text-[10px] text-gray-500 mb-1">
+                                <span id="curTime">0:00</span>
+                                <span id="durTime">0:00</span>
+                            </div>
+                            <input type="range" id="seekSlider" value="0" step="1" class="w-full">
+                        </div>
+                    </div>
+                    <div class="flex gap-4 mt-6">
+                        <button id="dlBtn" onclick="downloadSong()" class="flex-1 bg-gray-800 py-3 rounded-xl text-xs font-bold hover:bg-gray-700">Download MP3</button>
+                        <button onclick="location.reload()" class="flex-1 bg-blue-600/20 text-blue-400 py-3 rounded-xl text-xs font-bold border border-blue-500/30">New Track</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 ml-4">Recently Created</h3>
+            <div id="historyList" class="space-y-3">
+                </div>
+        </div>
+    </div>
+
+    <audio id="audio" crossorigin="anonymous"></audio>
+
+    <script>
+        let jobId = "";
+        let audio = document.getElementById('audio');
+        let playIcon = `<path d="M8 5v14l11-7z"/>`;
+        let pauseIcon = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
+
+        // 1. Load History on Startup
+        window.onload = () => {
+            renderHistory();
+        };
+
+        async function getLyrics() {
+            const prompt = document.getElementById('prompt').value;
+            if(!prompt) return;
+            document.getElementById('btn1').innerText = "AI is writing...";
+            
+            const fd = new FormData(); fd.append('prompt', prompt);
+            const res = await fetch('/get-lyrics', { method: 'POST', body: fd });
+            const data = await res.json();
+            
+            jobId = data.job_id;
+            document.getElementById('lyricsBox').value = data.lyrics;
+            document.getElementById('stage1').classList.add('hidden');
+            document.getElementById('stage2').classList.remove('hidden');
+        }
+
+        async function confirmLyrics() {
+            const lyrics = document.getElementById('lyricsBox').value;
+            const topic = document.getElementById('prompt').value;
+            document.getElementById('stage2').classList.add('hidden');
+            document.getElementById('stage3').classList.remove('hidden');
+
+            const fd = new FormData();
+            fd.append('job_id', jobId);
+            fd.append('final_lyrics', lyrics);
+            fd.append('topic', topic);
+            await fetch('/confirm-lyrics', { method: 'POST', body: fd });
+
+            const checker = setInterval(async () => {
+                const res = await fetch('/status/' + jobId);
+                const data = await res.json();
+                document.getElementById('statusText').innerText = data.status;
+
+                if(data.status === "Success") {
+                    clearInterval(checker);
+                    showPlayer(data.audio, topic);
+                    saveToHistory(topic, data.audio);
+                }
+            }, 4000);
+        }
+
+        // --- CUSTOM PLAYER LOGIC ---
+        function showPlayer(url, title) {
+            document.getElementById('spinner').classList.add('hidden');
+            document.getElementById('statusText').innerText = "Track Generated!";
+            document.getElementById('customPlayer').classList.remove('hidden');
+            audio.src = url;
+            
+            audio.onloadedmetadata = () => {
+                document.getElementById('durTime').innerText = formatTime(audio.duration);
+                document.getElementById('seekSlider').max = Math.floor(audio.duration);
+            };
+        }
+
+        function togglePlay() {
+            const svg = document.getElementById('playIcon');
+            if(audio.paused) {
+                audio.play();
+                svg.innerHTML = pauseIcon;
+            } else {
+                audio.pause();
+                svg.innerHTML = playIcon;
+            }
+        }
+
+        audio.ontimeupdate = () => {
+            document.getElementById('curTime').innerText = formatTime(audio.currentTime);
+            document.getElementById('seekSlider').value = Math.floor(audio.currentTime);
+        };
+
+        document.getElementById('seekSlider').oninput = (e) => {
+            audio.currentTime = e.target.value;
+        };
+
+        function formatTime(s) {
+            let m = Math.floor(s / 60);
+            let sec = Math.floor(s % 60);
+            return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        async function downloadSong() {
+            const response = await fetch(audio.src);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Songify_${Date.now()}.mp3`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        // --- HISTORY LOGIC ---
+        function saveToHistory(topic, url) {
+            let history = JSON.parse(localStorage.getItem('songify_history') || '[]');
+            history.unshift({ topic, url, date: new Date().toLocaleDateString() });
+            localStorage.setItem('songify_history', JSON.stringify(history.slice(0, 10))); // Save last 10
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            let history = JSON.parse(localStorage.getItem('songify_history') || '[]');
+            list.innerHTML = history.map(item => `
+                <div class="glass p-4 rounded-2xl flex justify-between items-center border-white/5">
+                    <div>
+                        <p class="text-sm font-bold text-gray-200">${item.topic}</p>
+                        <p class="text-[10px] text-gray-500">${item.date}</p>
+                    </div>
+                    <button onclick="showPlayer('${item.url}', '${item.topic}')" class="text-blue-500 hover:text-blue-400 text-xs font-bold">Play</button>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
